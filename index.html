@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weatherly | Global Weather Forecast</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><span class="logo-icon"><i class="fas fa-cloud-sun"></i></span> WEATHERLY</h1>
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Search city, country, or region...">
+                <button id="search-btn"><i class="fas fa-search"></i></button>
+                <button id="location-btn" title="Use my location"><i class="fas fa-location-arrow"></i></button>
+            </div>
+        </header>
+
+        <main>
+            <section class="current-weather">
+                <div class="weather-info">
+                    <div class="location-date">
+                        <h2 id="location">Loading...</h2>
+                        <p id="date"></p>
+                    </div>
+                    <div class="weather-main">
+                        <div class="temperature">
+                            <img id="weather-icon" src="https://openweathermap.org/img/wn/01d@2x.png" alt="Weather Icon">
+                            <h1 id="temp">--°C</h1>
+                        </div>
+                        <div class="weather-details">
+                            <p id="weather-desc">--</p>
+                            <p>Feels like: <span id="feels-like">--°C</span></p>
+                            <p>Humidity: <span id="humidity">--%</span></p>
+                            <p>Wind: <span id="wind">-- km/h</span></p>
+                            <p>Pressure: <span id="pressure">-- hPa</span></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="forecast">
+                <h3>5-Day Forecast</h3>
+                <div class="forecast-container" id="forecast-container">
+                    <!-- Forecast items will be added by JavaScript -->
+                </div>
+            </section>
+
+            <section class="nearby-cities">
+                <h3>Nearby Locations</h3>
+                <div class="cities-container" id="nearby-cities-container">
+                    <!-- Nearby cities will be added by JavaScript -->
+                </div>
+            </section>
+
+            <section class="weather-advice">
+                <h3>Weather Advice</h3>
+                <div class="advice-container" id="advice-container">
+                    <!-- Advice will be added by JavaScript -->
+                </div>
+            </section>
+
+            <section class="weather-alerts">
+                <h3>Weather Alerts</h3>
+                <div class="alerts-container" id="alerts-container">
+                    <!-- Alerts will be added by JavaScript -->
+                </div>
+            </section>
+
+            <section class="additional-info">
+                <div class="info-card">
+                    <h4>Sunrise & Sunset</h4>
+                    <div class="sun-times">
+                        <div>
+                            <i class="fas fa-sunrise"></i>
+                            <p>Sunrise: <span id="sunrise">--:-- --</span></p>
+                        </div>
+                        <div>
+                            <i class="fas fa-sunset"></i>
+                            <p>Sunset: <span id="sunset">--:-- --</span></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="info-card">
+                    <h4>Air Quality</h4>
+                    <div class="air-quality">
+                        <div class="aqi-value" id="aqi-value">--</div>
+                        <p id="aqi-text">--</p>
+                    </div>
+                </div>
+                <div class="info-card">
+                    <h4>UV Index</h4>
+                    <div class="uv-index">
+                        <div class="uv-value" id="uv-value">--</div>
+                        <p id="uv-text">--</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- <section class="interactive-map">
+                <h3>Interactive Weather Map</h3>
+                <div class="map-container">
+                    <iframe id="weather-map" frameborder="0" scrolling="no" marginheight="0" marginwidth="0"
+                            src="https://openweathermap.org/weathermap?basemap=map&cities=true&layer=radar&lat=0&lon=0&zoom=2"
+                            allowfullscreen></iframe>
+                </div>
+            </section> -->
+        </main>
+
+        <footer>
+            <p>© 2025 WEATHERLY | Final Year CSE Project</p>
+            <p>Data provided by OpenWeatherMap</p>
+        </footer>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Fetching weather data...</p>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
