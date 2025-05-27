@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weatherly | Global Weather Forecast</title>
+    <title>Weatherly | Global Forecast</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -19,98 +19,272 @@
         </header>
 
         <main>
-            <section class="current-weather">
+            <!-- Current Weather Section -->
+            <section class="current-weather loading">
                 <div class="weather-info">
                     <div class="location-date">
-                        <h2 id="location">Loading...</h2>
-                        <p id="date"></p>
+                        <h2 id="location" class="skeleton">Loading location...</h2>
+                        <p id="date" class="skeleton">Loading date...</p>
                     </div>
                     <div class="weather-main">
                         <div class="temperature">
-                            <img id="weather-icon" src="https://openweathermap.org/img/wn/01d@2x.png" alt="Weather Icon">
-                            <h1 id="temp">--°C</h1>
+                            <div id="weather-icon" class="skeleton"></div>
+                            <h1 id="temp" class="skeleton">--°C</h1>
                         </div>
                         <div class="weather-details">
-                            <p id="weather-desc">--</p>
-                            <p>Feels like: <span id="feels-like">--°C</span></p>
-                            <p>Humidity: <span id="humidity">--%</span></p>
-                            <p>Wind: <span id="wind">-- km/h</span></p>
-                            <p>Pressure: <span id="pressure">-- hPa</span></p>
+                            <p id="weather-desc" class="skeleton">Loading weather description...</p>
+                            <p>Feels like: <span id="feels-like" class="skeleton">--°C</span></p>
+                            <p>Humidity: <span id="humidity" class="skeleton">--%</span></p>
+                            <p>Wind: <span id="wind" class="skeleton">-- km/h</span></p>
+                            <p>Pressure: <span id="pressure" class="skeleton">-- hPa</span></p>
                         </div>
                     </div>
                 </div>
             </section>
 
+            <!-- 5-Day Forecast Section -->
             <section class="forecast">
                 <h3>5-Day Forecast</h3>
                 <div class="forecast-container" id="forecast-container">
-                    <!-- Forecast items will be added by JavaScript -->
+                    <!-- Forecast items will be inserted here by JavaScript -->
+                    <div class="forecast-item loading">
+                        <div class="forecast-day skeleton">--</div>
+                        <div class="forecast-icon skeleton"></div>
+                        <div class="forecast-desc skeleton">--</div>
+                        <div class="forecast-temp">
+                            <span class="forecast-max skeleton">--°</span>
+                            <span class="forecast-min skeleton">--°</span>
+                        </div>
+                    </div>
+                    <div class="forecast-item loading">
+                        <div class="forecast-day skeleton">--</div>
+                        <div class="forecast-icon skeleton"></div>
+                        <div class="forecast-desc skeleton">--</div>
+                        <div class="forecast-temp">
+                            <span class="forecast-max skeleton">--°</span>
+                            <span class="forecast-min skeleton">--°</span>
+                        </div>
+                    </div>
+                    <div class="forecast-item loading">
+                        <div class="forecast-day skeleton">--</div>
+                        <div class="forecast-icon skeleton"></div>
+                        <div class="forecast-desc skeleton">--</div>
+                        <div class="forecast-temp">
+                            <span class="forecast-max skeleton">--°</span>
+                            <span class="forecast-min skeleton">--°</span>
+                        </div>
+                    </div>
+                    <div class="forecast-item loading">
+                        <div class="forecast-day skeleton">--</div>
+                        <div class="forecast-icon skeleton"></div>
+                        <div class="forecast-desc skeleton">--</div>
+                        <div class="forecast-temp">
+                            <span class="forecast-max skeleton">--°</span>
+                            <span class="forecast-min skeleton">--°</span>
+                        </div>
+                    </div>
+                    <div class="forecast-item loading">
+                        <div class="forecast-day skeleton">--</div>
+                        <div class="forecast-icon skeleton"></div>
+                        <div class="forecast-desc skeleton">--</div>
+                        <div class="forecast-temp">
+                            <span class="forecast-max skeleton">--°</span>
+                            <span class="forecast-min skeleton">--°</span>
+                        </div>
+                    </div>
                 </div>
             </section>
 
+            <!-- Nearby Locations Section -->
             <section class="nearby-cities">
                 <h3>Nearby Locations</h3>
                 <div class="cities-container" id="nearby-cities-container">
-                    <!-- Nearby cities will be added by JavaScript -->
+                    <!-- Nearby cities will be inserted here by JavaScript -->
+                    <div class="city-card loading">
+                        <div class="city-name skeleton">--</div>
+                        <div class="city-distance skeleton">-- km away</div>
+                        <div class="city-weather">
+                            <div class="city-temp skeleton">--°C</div>
+                            <div class="city-icon skeleton"></div>
+                        </div>
+                    </div>
+                    <div class="city-card loading">
+                        <div class="city-name skeleton">--</div>
+                        <div class="city-distance skeleton">-- km away</div>
+                        <div class="city-weather">
+                            <div class="city-temp skeleton">--°C</div>
+                            <div class="city-icon skeleton"></div>
+                        </div>
+                    </div>
+                    <div class="city-card loading">
+                        <div class="city-name skeleton">--</div>
+                        <div class="city-distance skeleton">-- km away</div>
+                        <div class="city-weather">
+                            <div class="city-temp skeleton">--°C</div>
+                            <div class="city-icon skeleton"></div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
+            <!-- Weather Advice Section -->
             <section class="weather-advice">
                 <h3>Weather Advice</h3>
                 <div class="advice-container" id="advice-container">
-                    <!-- Advice will be added by JavaScript -->
+                    <!-- Advice cards will be inserted here by JavaScript -->
+                    <div class="advice-card loading">
+                        <div class="advice-icon skeleton"></div>
+                        <div class="advice-content">
+                            <h4 class="skeleton">Loading advice...</h4>
+                            <p class="skeleton">Loading advice details...</p>
+                        </div>
+                    </div>
+                    <div class="advice-card loading">
+                        <div class="advice-icon skeleton"></div>
+                        <div class="advice-content">
+                            <h4 class="skeleton">Loading advice...</h4>
+                            <p class="skeleton">Loading advice details...</p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
+            <!-- Weather Alerts Section -->
             <section class="weather-alerts">
                 <h3>Weather Alerts</h3>
                 <div class="alerts-container" id="alerts-container">
-                    <!-- Alerts will be added by JavaScript -->
+                    <!-- Alert cards will be inserted here by JavaScript -->
+                    <div class="alert-card loading">
+                        <div class="alert-icon skeleton"></div>
+                        <div class="alert-content">
+                            <h4 class="skeleton">Loading alerts...</h4>
+                            <p class="skeleton">Loading alert details...</p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
+            <!-- Additional Weather Information Section -->
             <section class="additional-info">
                 <div class="info-card">
                     <h4>Sunrise & Sunset</h4>
                     <div class="sun-times">
                         <div>
                             <i class="fas fa-sunrise"></i>
-                            <p>Sunrise: <span id="sunrise">--:-- --</span></p>
+                            <p>Sunrise: <span id="sunrise" class="skeleton">--:-- --</span></p>
                         </div>
                         <div>
                             <i class="fas fa-sunset"></i>
-                            <p>Sunset: <span id="sunset">--:-- --</span></p>
+                            <p>Sunset: <span id="sunset" class="skeleton">--:-- --</span></p>
                         </div>
                     </div>
                 </div>
                 <div class="info-card">
                     <h4>Air Quality</h4>
                     <div class="air-quality">
-                        <div class="aqi-value" id="aqi-value">--</div>
-                        <p id="aqi-text">--</p>
+                        <div class="aqi-value skeleton" id="aqi-value">--</div>
+                        <p id="aqi-text" class="skeleton">--</p>
                     </div>
                 </div>
                 <div class="info-card">
                     <h4>UV Index</h4>
                     <div class="uv-index">
-                        <div class="uv-value" id="uv-value">--</div>
-                        <p id="uv-text">--</p>
+                        <div class="uv-value skeleton" id="uv-value">--</div>
+                        <p id="uv-text" class="skeleton">--</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Interactive Weather Map Section -->
+            <section class="interactive-map">
+                <h3>Interactive Weather Map</h3>
+                <div class="map-container">
+                    <iframe id="weather-map" frameborder="0" scrolling="no" marginheight="0" marginwidth="0"
+                            src="about:blank" allowfullscreen></iframe>
+                </div>
+            </section>
+
+            <!-- Retry Button Section -->
+            <div class="retry-container" id="retry-container" style="display: none;">
+                <p>Some data failed to load</p>
+                <button id="retry-btn" class="retry-btn">
+                    <i class="fas fa-sync-alt"></i> Try Again
+                </button>
+            </div>
+
+            <!-- Health Recommendations Section -->
+            <section class="health-recommendations">
+                <h3>Health Recommendations</h3>
+                <div class="recommendations-container" id="recommendations-container">
+                    <div class="recommendation-card loading">
+                        <div class="recommendation-icon skeleton"></div>
+                        <div class="recommendation-content">
+                            <h4 class="skeleton">Loading health tips...</h4>
+                            <p class="skeleton">Loading detailed recommendations...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Clothing Suggestions Section -->
+            <section class="clothing-suggestions">
+                <h3>Recommended Clothing</h3>
+                <div class="clothing-container" id="clothing-container">
+                    <div class="clothing-item loading">
+                        <div class="clothing-icon skeleton"></div>
+                        <div class="clothing-desc skeleton">Loading clothing suggestions...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Historical Data Comparison Section -->
+            <section class="historical-data">
+                <h3>Historical Comparison</h3>
+                <div class="historical-container" id="historical-container">
+                    <div class="historical-card loading">
+                        <div class="historical-metric skeleton">--</div>
+                        <div class="historical-value skeleton">--</div>
+                        <div class="historical-comparison skeleton">--</div>
                     </div>
                 </div>
             </section>
         </main>
 
         <footer>
-            <p>© 2025 WEATHERLY | Final Year CSE Project</p>
+            <p>© 2025 Weartherly | Final Year CSE Project</p>
             <p>Data provided by OpenWeatherMap</p>
+            <div class="cache-controls">
+                <button id="clear-cache-btn" class="cache-btn">
+                    <i class="fas fa-trash-alt"></i> Clear Cache
+                </button>
+                <button id="refresh-data-btn" class="cache-btn">
+                    <i class="fas fa-sync"></i> Refresh Data
+                </button>
+            </div>
         </footer>
     </div>
 
+    <!-- Loading Overlay -->
     <div class="loading" id="loading">
         <div class="spinner"></div>
         <p>Fetching weather data...</p>
+        <div class="progress-bar">
+            <div class="progress" id="loading-progress"></div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+
+    <!-- Offline Warning Modal -->
+    <div class="offline-modal" id="offline-modal">
+        <div class="modal-content">
+            <h3><i class="fas fa-wifi-slash"></i> Offline Mode</h3>
+            <p>You are currently offline. Showing cached weather data which may be outdated.</p>
+            <button id="offline-ok-btn" class="modal-btn">OK</button>
+        </div>
     </div>
 
     <script src="script.js"></script>
 </body>
-</html>
+                        </html>
