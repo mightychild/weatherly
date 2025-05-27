@@ -5,16 +5,32 @@ const WEATHER_API_URL = 'https://api.openweathermap.org/data/2.5/weather';
 const FORECAST_API_URL = 'https://api.openweathermap.org/data/2.5/forecast';
 const AIR_POLLUTION_API_URL = 'https://api.openweathermap.org/data/2.5/air_pollution';
 
+// Cache Config
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes cache lifetime
+const MAX_RETRIES = 3; // Max retry attempts for API calls
+const BASE_DELAY = 1000; // Initial retry delay in ms
+
 // DOM Elements
 const searchInput = document.getElementById('search-input');
 const searchBtn = document.getElementById('search-btn');
 const locationBtn = document.getElementById('location-btn');
 const loading = document.getElementById('loading');
+const retryContainer = document.getElementById('retry-container');
+const retryBtn = document.getElementById('retry-btn');
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', () => {
     updateDate();
-    getWeatherByLocation(); // Try to get user's location by default
+    
+    // Try to load cached data first
+    const cachedWeather = getFromCache('last_weather');
+    if (cachedWeather) {
+        updateUIFromCache(cachedWeather);
+        showToast('Loaded cached weather data', 'warning');
+    }
+    
+    // Then try to get fresh data
+    getWeatherByLocation();
     
     // Event listeners
     searchBtn.addEventListener('click', handleSearch);
@@ -22,8 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') handleSearch();
     });
     locationBtn.addEventListener('click', getWeatherByLocation);
+    retryBtn.addEventListener('click', handleRetry);
 });
 
+// Handle search
 function handleSearch() {
     const query = searchInput.value.trim();
     if (query) {
@@ -31,44 +49,77 @@ function handleSearch() {
     }
 }
 
-// Get weather by city name, country, or region
+// Handle retry
+function handleRetry() {
+    retryContainer.style.display = 'none';
+    const currentLocation = document.getElementById('location').textContent;
+    if (currentLocation.includes(',')) {
+        getWeatherByCity(currentLocation);
+    } else {
+        getWeatherByLocation();
+    }
+}
+
+// Get weather by city name
 async function getWeatherByCity(query) {
     showLoading();
     try {
-        // Get coordinates first
-        const geoData = await fetch(`${GEOCODING_API_URL}/direct?q=${query}&limit=5&appid=${WEATHER_API_KEY}`);
-        const geoJson = await geoData.json();
+        // Use smartFetch with caching
+        const geoData = await smartFetch(
+            `${GEOCODING_API_URL}/direct?q=${query}&limit=5&appid=${WEATHER_API_KEY}`,
+            `geo_${query.toLowerCase()}`
+        );
         
-        if (geoJson.length === 0) {
-            alert('Location not found. Please try another search.');
-            hideLoading();
+        if (!geoData || geoData.length === 0) {
+            showToast('Location not found', 'error');
             return;
         }
         
-        // Use the first result by default
-        const { lat, lon, name, country, state } = geoJson[0];
-        
-        // Update search input with the official location name
+        const { lat, lon, name, country, state } = geoData[0];
         const displayName = state ? `${name}, ${state}, ${country}` : `${name}, ${country}`;
         searchInput.value = displayName;
         
-        // Get all weather data
-        await Promise.all([
-            updateWeatherData(lat, lon, name, country, state),
-            updateNearbyCities(lat, lon)
+        // Get all weather data in parallel
+        const [weatherData, forecastData] = await Promise.all([
+            smartFetch(
+                `${WEATHER_API_URL}?lat=${lat}&lon=${lon}&units=metric&appid=${WEATHER_API_KEY}`,
+                `weather_${lat}_${lon}`
+            ),
+            smartFetch(
+                `${FORECAST_API_URL}?lat=${lat}&lon=${lon}&units=metric&appid=${WEATHER_API_KEY}`,
+                `forecast_${lat}_${lon}`
+            )
         ]);
         
-        // Show notification for precipitation
-        const weatherData = await fetch(`${WEATHER_API_URL}?lat=${lat}&lon=${lon}&units=metric&appid=${WEATHER_API_KEY}`);
-        const weatherJson = await weatherData.json();
-        const weatherMain = weatherJson.weather[0].main;
-        if (['Rain', 'Thunderstorm', 'Snow'].includes(weatherMain)) {
-            showNotification('Weather Alert', `Expect ${weatherMain.toLowerCase()} in your area.`);
-        }
+        // Update UI with fresh data
+        updateCurrentWeather(weatherData, displayName);
+        updateForecast(forecastData);
+        updateAirQuality(lat, lon);
+        updateWeatherMap(lat, lon);
+        updateNearbyCities(lat, lon);
+        
+        // Save to cache
+        saveToCache('last_weather', {
+            weather: weatherData,
+            forecast: forecastData,
+            location: displayName,
+            timestamp: Date.now()
+        });
+        
+        showToast('Weather data updated', 'success');
         
     } catch (error) {
         console.error('Error fetching weather data:', error);
-        alert('Error fetching weather data. Please try again.');
+        
+        // Check if we have any cached data to fall back to
+        const cached = getFromCache('last_weather');
+        if (cached) {
+            showToast('Using cached data', 'warning');
+            updateUIFromCache(cached);
+        } else {
+            showToast('Failed to load data', 'error');
+            retryContainer.style.display = 'block';
+        }
     } finally {
         hideLoading();
     }
@@ -80,121 +131,141 @@ function getWeatherByLocation() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             async (position) => {
-                const { latitude, longitude } = position.coords;
                 try {
-                    // Get city name from coordinates
-                    const geoData = await fetch(`${GEOCODING_API_URL}/reverse?lat=${latitude}&lon=${longitude}&limit=1&appid=${WEATHER_API_KEY}`);
-                    const geoJson = await geoData.json();
+                    const { latitude, longitude } = position.coords;
                     
-                    if (geoJson.length === 0) {
-                        alert('Location not found. Please try again.');
-                        hideLoading();
-                        return;
+                    // Get city name from coordinates
+                    const geoData = await smartFetch(
+                        `${GEOCODING_API_URL}/reverse?lat=${latitude}&lon=${longitude}&limit=1&appid=${WEATHER_API_KEY}`,
+                        `geo_${latitude}_${longitude}`
+                    );
+                    
+                    if (!geoData || geoData.length === 0) {
+                        throw new Error('No location data found');
                     }
                     
-                    const { name, country, state } = geoJson[0];
+                    const { name, country, state } = geoData[0];
                     const displayName = state ? `${name}, ${state}, ${country}` : `${name}, ${country}`;
                     searchInput.value = displayName;
                     
                     // Get all weather data
-                    await Promise.all([
-                        updateWeatherData(latitude, longitude, name, country, state),
-                        updateNearbyCities(latitude, longitude)
-                    ]);
+                    await updateWeatherData(latitude, longitude, name, country, state);
+                    await updateNearbyCities(latitude, longitude);
                     
-                    // Show notification for precipitation
-                    const weatherData = await fetch(`${WEATHER_API_URL}?lat=${latitude}&lon=${longitude}&units=metric&appid=${WEATHER_API_KEY}`);
-                    const weatherJson = await weatherData.json();
-                    const weatherMain = weatherJson.weather[0].main;
-                    if (['Rain', 'Thunderstorm', 'Snow'].includes(weatherMain)) {
-                        showNotification('Weather Alert', `Expect ${weatherMain.toLowerCase()} in your area.`);
-                    }
+                    // Save to cache
+                    saveToCache('last_weather', {
+                        weather: await smartFetch(
+                            `${WEATHER_API_URL}?lat=${latitude}&lon=${longitude}&units=metric&appid=${WEATHER_API_KEY}`,
+                            `weather_${latitude}_${longitude}`
+                        ),
+                        forecast: await smartFetch(
+                            `${FORECAST_API_URL}?lat=${latitude}&lon=${longitude}&units=metric&appid=${WEATHER_API_KEY}`,
+                            `forecast_${latitude}_${longitude}`
+                        ),
+                        location: displayName,
+                        timestamp: Date.now()
+                    });
                     
                 } catch (error) {
-                    console.error('Error fetching location data:', error);
-                    alert('Error fetching location data. Please try again.');
+                    console.error('Error getting location weather:', error);
+                    
+                    // Fallback to default city if we have no cached data
+                    const cached = getFromCache('last_weather');
+                    if (!cached) {
+                        getWeatherByCity("London");
+                    } else {
+                        showToast('Using cached data', 'warning');
+                    }
                 } finally {
                     hideLoading();
                 }
             },
             (error) => {
                 console.error('Geolocation error:', error);
-                // Fallback to a default city if location access is denied
-                getWeatherByCity("London");
-            }
+                hideLoading();
+                
+                // Fallback to default city if location access denied
+                const cached = getFromCache('last_weather');
+                if (!cached) {
+                    getWeatherByCity("London");
+                } else {
+                    showToast('Using cached data', 'warning');
+                }
+            },
+            { timeout: 10000 } // 10 second timeout for geolocation
         );
     } else {
-        // Geolocation not supported - fallback to default city
-        getWeatherByCity("London");
+        hideLoading();
+        showToast('Geolocation not supported', 'error');
+        getWeatherByCity("London"); // Fallback to default city
     }
 }
 
-// Update all weather data for a location
-async function updateWeatherData(lat, lon, name, country, state) {
+// Smart fetch with caching and retry
+async function smartFetch(url, cacheKey, retries = MAX_RETRIES) {
+    // Try cache first
+    const cached = getFromCache(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        return cached.data;
+    }
+    
+    let attempt = 0;
+    while (attempt < retries) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const data = await response.json();
+            saveToCache(cacheKey, data);
+            return data;
+        } catch (error) {
+            attempt++;
+            if (attempt >= retries) {
+                // If we have cached data, return it even if stale
+                if (cached) {
+                    showToast('Using cached data (may be outdated)', 'warning');
+                    return cached.data;
+                }
+                throw error;
+            }
+            
+            // Exponential backoff
+            const delay = BASE_DELAY * Math.pow(2, attempt);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+}
+
+// Cache helpers
+function saveToCache(key, data) {
     try {
-        const [weatherData, forecastData] = await Promise.all([
-            fetch(`${WEATHER_API_URL}?lat=${lat}&lon=${lon}&units=metric&appid=${WEATHER_API_KEY}`),
-            fetch(`${FORECAST_API_URL}?lat=${lat}&lon=${lon}&units=metric&appid=${WEATHER_API_KEY}`)
-        ]);
-        
-        const weatherJson = await weatherData.json();
-        const forecastJson = await forecastData.json();
-        
-        // Update UI
-        const displayName = state ? `${name}, ${state}, ${country}` : `${name}, ${country}`;
-        updateCurrentWeather(weatherJson, displayName);
-        updateForecast(forecastJson);
-        updateAirQuality(lat, lon);
-        updateWeatherMap(lat, lon);
+        const item = {
+            data: data,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(`weather_${key}`, JSON.stringify(item));
     } catch (error) {
-        console.error('Error updating weather data:', error);
-        throw error;
+        console.error('Error saving to cache:', error);
     }
 }
 
-// Update nearby cities data
-async function updateNearbyCities(lat, lon) {
+function getFromCache(key) {
     try {
-        // First get city names around the location (limited to 5 for demo)
-        const response = await fetch(`${GEOCODING_API_URL}/reverse?lat=${lat}&lon=${lon}&limit=5&appid=${WEATHER_API_KEY}`);
-        const citiesData = await response.json();
-        
-        // Get weather for each nearby city
-        const citiesWithWeather = await Promise.all(
-            citiesData.map(async city => {
-                const weatherRes = await fetch(`${WEATHER_API_URL}?lat=${city.lat}&lon=${city.lon}&units=metric&appid=${WEATHER_API_KEY}`);
-                const weather = await weatherRes.json();
-                return {
-                    name: city.name,
-                    country: city.country,
-                    state: city.state,
-                    distance: calculateDistance(lat, lon, city.lat, city.lon),
-                    temp: Math.round(weather.main.temp),
-                    icon: weather.weather[0].icon,
-                    desc: weather.weather[0].main
-                };
-            })
-        );
-        
-        // Update UI
-        updateNearbyCitiesUI(citiesWithWeather);
+        const item = localStorage.getItem(`weather_${key}`);
+        return item ? JSON.parse(item) : null;
     } catch (error) {
-        console.error('Error fetching nearby cities:', error);
-        // Silently fail - nearby cities is secondary feature
+        console.error('Error reading from cache:', error);
+        return null;
     }
 }
 
-// Calculate distance between two coordinates in km
-function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Earth radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-        Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return Math.round(R * c);
+// Update UI from cached data
+function updateUIFromCache(cached) {
+    updateCurrentWeather(cached.weather, cached.location);
+    if (cached.forecast) {
+        updateForecast(cached.forecast);
+    }
+    // Note: Nearby cities and map won't be updated from cache
 }
 
 // Update current weather UI
@@ -209,8 +280,10 @@ function updateCurrentWeather(data, location) {
     
     // Set weather icon
     const iconCode = data.weather[0].icon;
-    document.getElementById('weather-icon').src = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
-    document.getElementById('weather-icon').alt = data.weather[0].main;
+    const iconElement = document.getElementById('weather-icon');
+    iconElement.src = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+    iconElement.alt = data.weather[0].main;
+    iconElement.style.background = 'transparent'; // Remove skeleton background
     
     // Update sunrise and sunset times
     const sunriseTime = new Date(data.sys.sunrise * 1000);
@@ -218,26 +291,14 @@ function updateCurrentWeather(data, location) {
     document.getElementById('sunrise').textContent = sunriseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     document.getElementById('sunset').textContent = sunsetTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
-    // UV index (simulated based on temperature and conditions)
-    let uvIndex;
-    if (data.weather[0].main === 'Rain') {
-        uvIndex = Math.random() * 2; // Low UV when raining
-    } else {
-        uvIndex = Math.min(data.main.temp / 5 + Math.random() * 2, 12); // Higher UV with higher temps
-    }
-    document.getElementById('uv-value').textContent = uvIndex.toFixed(1);
-    updateUIStyle(uvIndex, 'uv-value', 'uv-text', [
-        { max: 2, text: 'Low', color: '#2ecc71' },
-        { max: 5, text: 'Moderate', color: '#f1c40f' },
-        { max: 7, text: 'High', color: '#e67e22' },
-        { max: 10, text: 'Very High', color: '#e74c3c' },
-        { max: Infinity, text: 'Extreme', color: '#8e44ad' }
-    ]);
+    // Remove skeleton classes
+    document.querySelector('.current-weather').classList.remove('loading');
+    document.querySelectorAll('.current-weather .skeleton').forEach(el => {
+        el.classList.remove('skeleton');
+    });
     
-    // Update advice based on weather
+    // Update advice and alerts
     updateWeatherAdvice(data);
-    
-    // Update weather alerts
     updateWeatherAlerts(data);
 }
 
@@ -271,11 +332,10 @@ function updateForecast(data) {
     
     forecastDays.forEach(day => {
         const dayName = day.date.toLocaleDateString('en-US', { weekday: 'short' });
-        const avgTemp = day.temps.reduce((a, b) => a + b, 0) / day.temps.length;
         const maxTemp = Math.max(...day.temps);
         const minTemp = Math.min(...day.temps);
         
-        // Use the most frequent icon or first one
+        // Use the most frequent icon
         const iconCounts = {};
         day.icons.forEach(icon => {
             iconCounts[icon] = (iconCounts[icon] || 0) + 1;
@@ -286,7 +346,6 @@ function updateForecast(data) {
         
         const forecastItem = document.createElement('div');
         forecastItem.className = 'forecast-item';
-        
         forecastItem.innerHTML = `
             <div class="forecast-day">${dayName}</div>
             <img class="forecast-icon" src="https://openweathermap.org/img/wn/${mostFrequentIcon}.png" alt="${day.main}">
@@ -296,39 +355,89 @@ function updateForecast(data) {
                 <span class="forecast-min">${Math.round(minTemp)}°</span>
             </div>
         `;
-        
         forecastContainer.appendChild(forecastItem);
     });
 }
 
 // Update nearby cities UI
-function updateNearbyCitiesUI(cities) {
-    const container = document.getElementById('nearby-cities-container');
-    container.innerHTML = '';
-    
-    // Skip the first city (it's the current one)
-    const nearbyCities = cities.slice(1);
-    
-    nearbyCities.forEach(city => {
-        const cityCard = document.createElement('div');
-        cityCard.className = 'city-card';
-        cityCard.addEventListener('click', () => {
-            const query = city.state ? `${city.name}, ${city.state}, ${city.country}` : `${city.name}, ${city.country}`;
-            searchInput.value = query;
-            getWeatherByCity(query);
+async function updateNearbyCities(lat, lon) {
+    try {
+        const citiesData = await smartFetch(
+            `${GEOCODING_API_URL}/reverse?lat=${lat}&lon=${lon}&limit=5&appid=${WEATHER_API_KEY}`,
+            `nearby_${lat}_${lon}`
+        );
+        
+        if (!citiesData || citiesData.length === 0) return;
+        
+        // Get weather for each nearby city
+        const citiesWithWeather = await Promise.all(
+            citiesData.slice(0, 3).map(async (location) => {
+                try {
+                    const weather = await smartFetch(
+                        `${WEATHER_API_URL}?lat=${location.lat}&lon=${location.lon}&units=metric&appid=${WEATHER_API_KEY}`,
+                        `weather_${location.lat}_${location.lon}`
+                    );
+                    
+                    return {
+                        name: location.name || "Unknown",
+                        country: location.country || "",
+                        state: location.state || "",
+                        distance: calculateDistance(lat, lon, location.lat, location.lon),
+                        temp: Math.round(weather.main?.temp) || "--",
+                        icon: weather.weather?.[0]?.icon || "01d",
+                        desc: weather.weather?.[0]?.main || "Unknown"
+                    };
+                } catch (error) {
+                    console.error('Error getting nearby city weather:', error);
+                    return null;
+                }
+            })
+        );
+        
+        // Filter out failed requests
+        const validCities = citiesWithWeather.filter(city => city !== null);
+        if (validCities.length === 0) return;
+        
+        // Update UI
+        const container = document.getElementById('nearby-cities-container');
+        container.innerHTML = '';
+        
+        validCities.forEach(city => {
+            const cityCard = document.createElement('div');
+            cityCard.className = 'city-card';
+            cityCard.addEventListener('click', () => {
+                const query = city.state ? `${city.name}, ${city.state}, ${city.country}` : `${city.name}, ${city.country}`;
+                searchInput.value = query;
+                getWeatherByCity(query);
+            });
+            
+            cityCard.innerHTML = `
+                <div class="city-name">${city.name}, ${city.country}</div>
+                <div class="city-distance">${city.distance} km away</div>
+                <div class="city-weather">
+                    <div class="city-temp">${city.temp}°C</div>
+                    <img class="city-icon" src="https://openweathermap.org/img/wn/${city.icon}.png" alt="${city.desc}">
+                </div>
+            `;
+            container.appendChild(cityCard);
         });
         
-        cityCard.innerHTML = `
-            <div class="city-name">${city.name}, ${city.country}</div>
-            <div class="city-distance">${city.distance} km away</div>
-            <div class="city-weather">
-                <div class="city-temp">${city.temp}°C</div>
-                <img class="city-icon" src="https://openweathermap.org/img/wn/${city.icon}.png" alt="${city.desc}">
-            </div>
-        `;
-        
-        container.appendChild(cityCard);
-    });
+    } catch (error) {
+        console.error('Error updating nearby cities:', error);
+    }
+}
+
+// Calculate distance between coordinates
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return Math.round(R * c);
 }
 
 // Update weather advice
@@ -338,10 +447,8 @@ function updateWeatherAdvice(data) {
     
     const temp = data.main.temp;
     const weatherMain = data.weather[0].main;
-    const weatherDesc = data.weather[0].description;
     const humidity = data.main.humidity;
     const windSpeed = data.wind.speed;
-    const uvIndex = parseFloat(document.getElementById('uv-value').textContent);
     
     const adviceList = [];
     
@@ -384,15 +491,6 @@ function updateWeatherAdvice(data) {
         });
     }
     
-    // UV advice
-    if (uvIndex >= 6) {
-        adviceList.push({
-            icon: 'fas fa-sun',
-            title: 'UV Protection Needed',
-            text: 'Apply SPF 30+ sunscreen. Wear sunglasses and a wide-brimmed hat. Seek shade during midday hours.'
-        });
-    }
-    
     // Humidity advice
     if (humidity > 70) {
         adviceList.push({
@@ -424,7 +522,7 @@ function updateWeatherAdvice(data) {
     adviceList.push(generateTravelAdvice(weatherMain, windSpeed));
     
     // Display all advice
-    adviceList.forEach(advice => {
+adviceList.forEach(advice => {
         const adviceCard = document.createElement('div');
         adviceCard.className = 'advice-card';
         adviceCard.innerHTML = `
@@ -515,13 +613,11 @@ function generateTravelAdvice(weatherMain, windSpeed) {
     };
 }
 
-// Weather alerts function
+// Update weather alerts
 function updateWeatherAlerts(data) {
     const alertsContainer = document.getElementById('alerts-container');
     alertsContainer.innerHTML = '';
     
-    // In a real app, you would get this from the API's alerts field
-    // This is a simulation based on weather conditions
     const alerts = [];
     
     if (data.weather[0].main === 'Thunderstorm') {
@@ -579,10 +675,10 @@ function updateWeatherAlerts(data) {
     }
 }
 
-// Update air quality (simplified - actual implementation requires different API)
+// Update air quality
 function updateAirQuality(lat, lon) {
     // Mock data - in a real app you would call the air pollution API
-    const aqi = Math.floor(Math.random() * 150) + 1; // Random AQI between 1-150
+    const aqi = Math.floor(Math.random() * 150) + 1;
     document.getElementById('aqi-value').textContent = aqi;
     
     updateUIStyle(aqi, 'aqi-value', 'aqi-text', [
@@ -592,6 +688,10 @@ function updateAirQuality(lat, lon) {
         { max: 200, text: 'Very Unhealthy', color: '#e74c3c' },
         { max: Infinity, text: 'Hazardous', color: '#8e44ad' }
     ]);
+    
+    // Remove skeleton class
+    document.getElementById('aqi-value').classList.remove('skeleton');
+    document.getElementById('aqi-text').classList.remove('skeleton');
 }
 
 // Update interactive weather map
@@ -600,7 +700,7 @@ function updateWeatherMap(lat, lon) {
     map.src = `https://openweathermap.org/weathermap?basemap=map&cities=true&layer=radar&lat=${lat}&lon=${lon}&zoom=8`;
 }
 
-// Generic function to update UI style based on value ranges
+// Update UI style based on value ranges
 function updateUIStyle(value, valueElementId, textElementId, ranges) {
     const valueElement = document.getElementById(valueElementId);
     let bgColor = '';
@@ -625,36 +725,30 @@ function updateDate() {
     const now = new Date();
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     document.getElementById('date').textContent = now.toLocaleDateString('en-US', options);
+    document.getElementById('date').classList.remove('skeleton');
 }
 
-// Show notification function
-function showNotification(title, message) {
-    // Check if browser supports notifications
-    if (!("Notification" in window)) {
-        console.log("This browser does not support desktop notification");
-        return;
-    }
+// Show toast notification
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.getElementById('toast-container').appendChild(toast);
     
-    // Check if notification permissions are already granted
-    if (Notification.permission === "granted") {
-        new Notification(title, { body: message });
-    } 
-    // Otherwise, ask for permission
-    else if (Notification.permission !== "denied") {
-        Notification.requestPermission().then(permission => {
-            if (permission === "granted") {
-                new Notification(title, { body: message });
-            }
-        });
-    }
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
 }
 
-// Show loading spinner
+// Show loading overlay
 function showLoading() {
     loading.style.display = 'flex';
 }
 
-// Hide loading spinner
+// Hide loading overlay
 function hideLoading() {
     loading.style.display = 'none';
 }
