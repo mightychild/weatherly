@@ -13,6 +13,10 @@
     --info-color: #3498db;
 }
 
+.loading {
+    display: none !important;
+}
+
 * {
     margin: 0;
     padding: 0;
