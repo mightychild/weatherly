@@ -1,4 +1,4 @@
-// API Keys and URL
+// API Keys and URLs
 const WEATHER_API_KEY = '1362459dfaf30dd3ae6abdab69b81c7a';
 const GEOCODING_API_URL = 'https://api.openweathermap.org/geo/1.0';
 const WEATHER_API_URL = 'https://api.openweathermap.org/data/2.5/weather';
